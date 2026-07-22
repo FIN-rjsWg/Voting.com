@@ -1,416 +1,342 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Live Poll — 실시간 설문/투표</title>
-<style>
-  :root {
-    --ink: #1a1d29;
-    --paper: #fafaf7;
-    --line: #e4e2da;
-    --accent: #3454d1;
-    --accent-soft: #e8ecfb;
-    --good: #1e824c;
-    --warn: #c0392b;
-    --mono: 'SFMono-Regular', Consolas, monospace;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    line-height: 1.5;
-  }
-  header {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--line);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  header h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
-  header h1 span { color: var(--accent); }
-  #status { font-family: var(--mono); font-size: 12px; color: #888; }
-  #status.on { color: var(--good); }
-
-  main { max-width: 880px; margin: 0 auto; padding: 24px; display: grid; gap: 20px; }
-  .card {
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 18px 20px;
-  }
-  .card h2 { font-size: 14px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #666; }
-
-  input, textarea, button {
-    font: inherit;
-    border-radius: 6px;
-    border: 1px solid var(--line);
-    padding: 9px 11px;
-  }
-  input, textarea { width: 100%; background: var(--paper); }
-  button {
-    background: var(--ink);
-    color: #fff;
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    transition: opacity .15s;
-  }
-  button:hover { opacity: 0.85; }
-  button.secondary { background: var(--accent-soft); color: var(--accent); }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  .row { display: flex; gap: 8px; }
-  .row > * { flex: 1; }
-
-  #authArea .row { margin-bottom: 8px; }
-  #whoami { font-family: var(--mono); font-size: 13px; }
-
-  .option-input-row { display: flex; gap: 6px; margin-bottom: 6px; }
-  .option-input-row input { flex: 1; }
-  .option-input-row button { flex: 0 0 auto; padding: 9px 12px; }
-
-  #pollList { display: grid; gap: 10px; }
-  .poll-item {
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 12px 14px;
-    cursor: pointer;
-  }
-  .poll-item:hover { border-color: var(--accent); }
-  .poll-item .q { font-weight: 600; }
-  .poll-item .meta { font-size: 12px; color: #888; margin-top: 2px; }
-
-  #pollDetail .options { display: grid; gap: 8px; margin: 12px 0; }
-  .option-bar {
-    position: relative;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 10px 12px;
-    overflow: hidden;
-    cursor: pointer;
-    background: var(--paper);
-  }
-  .option-bar .fill {
-    position: absolute;
-    inset: 0;
-    background: var(--accent-soft);
-    width: 0%;
-    transition: width .3s ease;
-    z-index: 0;
-  }
-  .option-bar .label { position: relative; z-index: 1; display: flex; justify-content: space-between; font-size: 14px; }
-  .option-bar:hover { border-color: var(--accent); }
-
-  #chatLog {
-    height: 180px;
-    overflow-y: auto;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 8px 10px;
-    background: var(--paper);
-    font-size: 13px;
-    margin-bottom: 8px;
-  }
-  #chatLog .msg { margin-bottom: 4px; }
-  #chatLog .msg b { color: var(--accent); }
-  #chatLog .sys { color: #999; font-style: italic; }
-
-  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
-  .badge.open { background: #e6f4ea; color: var(--good); }
-  .badge.closed { background: #fbe9e7; color: var(--warn); }
-
-  .hidden { display: none !important; }
-  .hint { font-size: 12px; color: #999; margin-top: 6px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseVote - BPM 기반 실시간 투표</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="container">
+        <header class="header">
+            <h1 class="logo">
+                <span class="pulse-icon">❤️</span> PulseVote
+            </h1>
+            <div id="auth-controls" class="auth-controls">
+                <!-- 로그인 상태에 따라 JS로 채워짐 -->
+            </div>
+        </header>
 
-<header>
-  <h1>Live<span>Poll</span> — 실시간 설문/투표</h1>
-  <div id="status">WS 연결 안 됨</div>
-</header>
+        <main>
+            <section id="polls-section" class="section">
+                <div class="section-header">
+                    <h2>진행 중인 투표</h2>
+                    <button id="create-poll-btn" class="btn primary glow">새 투표 만들기</button>
+                </div>
+                <div id="polls-container" class="polls-grid">
+                    <!-- 투표 목록이 여기에 렌더링됩니다 -->
+                </div>
+            </section>
 
-<main>
-
-  <section class="card" id="authArea">
-    <h2>1. 회원가입 / 로그인</h2>
-    <div id="loginForm">
-      <div class="row">
-        <input id="username" placeholder="사용자명" />
-        <input id="password" type="password" placeholder="비밀번호 (4자 이상)" />
-      </div>
-      <div class="row">
-        <button id="btnSignup" class="secondary">회원가입</button>
-        <button id="btnLogin">로그인</button>
-      </div>
-    </div>
-    <div id="whoamiArea" class="hidden">
-      <span id="whoami"></span>
-      &nbsp;·&nbsp;
-      <button id="btnLogout" class="secondary" style="padding:4px 10px;">로그아웃</button>
-    </div>
-  </section>
-
-  <section class="card hidden" id="createArea">
-    <h2>2. 설문 만들기</h2>
-    <input id="question" placeholder="질문을 입력하세요 (예: 오늘 점심 뭐 먹지?)" style="margin-bottom:8px;" />
-    <div id="optionInputs"></div>
-    <button id="btnAddOption" class="secondary" style="margin-bottom:8px;">+ 선택지 추가</button>
-    <div class="row">
-      <button id="btnCreatePoll">설문 생성</button>
-    </div>
-  </section>
-
-  <section class="card hidden" id="listArea">
-    <h2>3. 설문 목록 (클릭해서 입장)</h2>
-    <div id="pollList"></div>
-  </section>
-
-  <section class="card hidden" id="pollDetail">
-    <h2 id="pollQuestion">-</h2>
-    <span id="pollBadge" class="badge open">진행중</span>
-    <div class="options" id="optionsArea"></div>
-    <div class="row" id="closeRow">
-      <button id="btnClose" class="secondary">설문 마감 (생성자만)</button>
+            <section id="detail-section" class="section detail-section hidden">
+                <div class="section-header">
+                    <h2 id="detail-title">투표 제목</h2>
+                    <div class="detail-actions">
+                        <span class="poll-stats-inline">
+                            총 투표수: <b id="detail-total">0</b> ·
+                            <span class="bpm-display">Avg BPM: <b id="detail-bpm" class="glow-text">--</b></span>
+                        </span>
+                        <button id="close-poll-btn" class="btn danger">투표 마감</button>
+                        <button id="back-btn" class="btn ghost">목록으로</button>
+                    </div>
+                </div>
+                <div id="options-container" class="options-list"></div>
+            </section>
+        </main>
     </div>
 
-    <h2 style="margin-top:18px;">실시간 채팅</h2>
-    <div id="chatLog"></div>
-    <div class="row">
-      <input id="chatInput" placeholder="의견을 입력하세요..." />
-      <button id="btnSendChat">전송</button>
+    <!-- 투표 생성 모달 -->
+    <div id="create-modal" class="modal-overlay hidden">
+        <div class="modal">
+            <h3>새 투표 만들기</h3>
+            <label class="field-label">투표 제목</label>
+            <input id="poll-title-input" type="text" class="text-input" placeholder="예: 오늘 점심 뭐 먹지?">
+            <label class="field-label">선택지</label>
+            <div id="options-inputs" class="options-inputs">
+                <input type="text" class="text-input option-input" placeholder="선택지 1">
+                <input type="text" class="text-input option-input" placeholder="선택지 2">
+            </div>
+            <button id="add-option-btn" class="btn ghost small">+ 선택지 추가</button>
+            <p id="create-error" class="error-text hidden"></p>
+            <div class="modal-actions">
+                <button id="cancel-create-btn" class="btn ghost">취소</button>
+                <button id="submit-create-btn" class="btn primary glow">만들기</button>
+            </div>
+        </div>
     </div>
-  </section>
 
-</main>
+    <!-- Socket.io 클라이언트 (실제 서버 환경에서는 동작, 로컬 단독 테스트 시에는 오류를 무시하세요) -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // 클라이언트 로직
+        const socket = typeof io !== 'undefined' ? io() : { on: () => {}, emit: () => {} };
 
-<script>
-const API = '';
-let token = null, me = null, ws = null, currentPollId = null;
+        // userId / 닉네임
+        let currentUserId = localStorage.getItem('userId') || 'user_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('userId', currentUserId);
+        let currentNickname = localStorage.getItem('nickname') || null;
+        let currentRoom = null;
+        let currentPollCache = null;
 
-const $ = (id) => document.getElementById(id);
+        // --- 인증 UI ---
+        function renderAuth() {
+            const el = document.getElementById('auth-controls');
+            if (currentNickname) {
+                el.innerHTML = `
+                    <span class="user-badge">${escapeHtml(currentNickname)}님</span>
+                    <button id="logout-btn" class="btn ghost small">로그아웃</button>
+                `;
+                document.getElementById('logout-btn').onclick = () => {
+                    currentNickname = null;
+                    localStorage.removeItem('nickname');
+                    renderAuth();
+                };
+            } else {
+                el.innerHTML = `<button id="login-btn" class="btn primary small">로그인</button>`;
+                document.getElementById('login-btn').onclick = () => {
+                    const name = prompt('닉네임을 입력하세요');
+                    if (name && name.trim()) {
+                        currentNickname = name.trim();
+                        localStorage.setItem('nickname', currentNickname);
+                        renderAuth();
+                    }
+                };
+            }
+        }
 
-// ---------- Auth ----------
-async function signup() {
-  const username = $('username').value.trim();
-  const password = $('password').value;
-  const res = await fetch(`${API}/api/auth/signup`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ username, password })
-  });
-  const data = await res.json();
-  alert(res.ok ? `가입 완료: ${data.username}. 이제 로그인하세요.` : `오류: ${data.error}`);
-}
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.innerText = str;
+            return div.innerHTML;
+        }
 
-async function login() {
-  const username = $('username').value.trim();
-  const password = $('password').value;
-  const res = await fetch(`${API}/api/auth/login`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ username, password })
-  });
-  const data = await res.json();
-  if (!res.ok) return alert(`오류: ${data.error}`);
-  token = data.token; me = data.user;
-  onLoggedIn();
-}
+        // --- WebSocket 이벤트 리스너 ---
+        socket.on('vote:cast', (data) => {
+            updatePollUI(data);
+        });
 
-function onLoggedIn() {
-  $('loginForm').classList.add('hidden');
-  $('whoamiArea').classList.remove('hidden');
-  $('whoami').textContent = `👤 ${me.username} 로그인됨`;
-  $('createArea').classList.remove('hidden');
-  $('listArea').classList.remove('hidden');
-  connectWS();
-  loadPolls();
-}
+        socket.on('poll:closed', () => {
+            alert('현재 보고 계신 투표가 마감되었습니다.');
+            loadPolls();
+            showList();
+        });
 
-function logout() {
-  token = null; me = null;
-  if (ws) ws.close();
-  $('loginForm').classList.remove('hidden');
-  $('whoamiArea').classList.add('hidden');
-  $('createArea').classList.add('hidden');
-  $('listArea').classList.add('hidden');
-  $('pollDetail').classList.add('hidden');
-}
+        // 가상의 심장 박동(BPM) 전송 시뮬레이터
+        setInterval(() => {
+            if (currentRoom && currentUserId) {
+                const simulatedBPM = Math.floor(Math.random() * (120 - 60 + 1)) + 60; // 60~120 BPM
+                socket.emit('pulse:heartbeat', {
+                    pollId: currentRoom,
+                    userId: currentUserId,
+                    bpm: simulatedBPM
+                });
 
-$('btnSignup').onclick = signup;
-$('btnLogin').onclick = login;
-$('btnLogout').onclick = logout;
+                const pulseIcon = document.querySelector('.pulse-icon');
+                if (pulseIcon) {
+                    pulseIcon.style.animation = `heartbeat ${60 / simulatedBPM}s infinite`;
+                }
+            }
+        }, 3000);
 
-// ---------- WebSocket ----------
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/ws?token=${token}`);
+        // --- API 호출 및 렌더링 ---
+        async function loadPolls() {
+            try {
+                const res = await fetch('/api/polls');
+                const polls = await res.json();
+                renderPolls(polls);
+            } catch (err) {
+                console.error('Failed to load polls', err);
+                document.getElementById('polls-container').innerHTML =
+                    '<p class="empty-text">서버에 연결할 수 없습니다. (단독 미리보기 모드)</p>';
+            }
+        }
 
-  ws.onopen = () => { $('status').textContent = 'WS 연결됨'; $('status').classList.add('on'); };
-  ws.onclose = () => { $('status').textContent = 'WS 끊김'; $('status').classList.remove('on'); };
+        function renderPolls(polls) {
+            const container = document.getElementById('polls-container');
+            if (!polls.length) {
+                container.innerHTML = '<p class="empty-text">아직 투표가 없습니다. 새 투표를 만들어보세요!</p>';
+                return;
+            }
+            container.innerHTML = polls.map(poll => `
+                <div class="poll-card ${!poll.isOpen ? 'closed' : ''}" data-id="${poll.id}">
+                    <div class="poll-status ${poll.isOpen ? 'active' : ''}">
+                        ${poll.isOpen ? '진행 중' : '마감됨'}
+                    </div>
+                    <h3>${escapeHtml(poll.title)}</h3>
+                    <div class="poll-stats">
+                        <span>총 투표수: <b id="total-${poll.id}">${poll.totalVotes || 0}</b></span>
+                        <span class="bpm-display">Avg BPM: <b id="bpm-${poll.id}" class="glow-text">${poll.averageBpm ?? '--'}</b></span>
+                    </div>
+                </div>
+            `).join('');
+            container.querySelectorAll('.poll-card').forEach(card => {
+                card.addEventListener('click', () => joinPoll(card.dataset.id));
+            });
+        }
 
-  ws.onmessage = (evt) => {
-    const msg = JSON.parse(evt.data);
-    if (msg.type === 'vote_update' && msg.pollId === currentPollId) {
-      renderResults(msg.results, msg.total);
-    } else if (msg.type === 'chat' && msg.pollId === currentPollId) {
-      appendChat(msg.username, msg.message);
-    } else if (msg.type === 'poll_closed' && msg.pollId === currentPollId) {
-      $('pollBadge').textContent = '마감됨';
-      $('pollBadge').className = 'badge closed';
-      appendChat(null, '⚠️ 설문이 마감되었습니다.', true);
-    }
-  };
-}
+        async function joinPoll(pollId) {
+            const res = await fetch(`/api/polls/${pollId}`);
+            if (!res.ok) return;
+            const poll = await res.json();
 
-// ---------- Poll Create ----------
-let optionCount = 0;
-function addOptionInput(value = '') {
-  optionCount++;
-  const row = document.createElement('div');
-  row.className = 'option-input-row';
-  row.innerHTML = `<input class="opt-input" placeholder="선택지 ${optionCount}" value="${value}" />`;
-  $('optionInputs').appendChild(row);
-}
-addOptionInput(); addOptionInput();
-$('btnAddOption').onclick = () => addOptionInput();
+            if (currentRoom) socket.emit('room:leave', currentRoom);
+            currentRoom = pollId;
+            currentPollCache = poll;
+            socket.emit('room:join', pollId);
+            console.log(`Joined poll room: ${pollId}`);
 
-$('btnCreatePoll').onclick = async () => {
-  const question = $('question').value.trim();
-  const options = [...document.querySelectorAll('.opt-input')].map(i => i.value.trim()).filter(Boolean);
-  if (!question || options.length < 2) return alert('질문과 선택지 2개 이상을 입력하세요.');
+            showDetail(poll);
+        }
 
-  const res = await fetch(`${API}/api/polls`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ question, options })
-  });
-  const data = await res.json();
-  if (!res.ok) return alert(`오류: ${data.error}`);
+        function showDetail(poll) {
+            document.getElementById('polls-section').classList.add('hidden');
+            document.getElementById('detail-section').classList.remove('hidden');
+            document.getElementById('detail-title').innerText = poll.title;
+            document.getElementById('detail-total').innerText = poll.totalVotes || 0;
+            document.getElementById('detail-bpm').innerText = poll.averageBpm ?? '--';
+            document.getElementById('close-poll-btn').style.display = poll.isOpen ? '' : 'none';
 
-  $('question').value = '';
-  document.querySelectorAll('.opt-input').forEach(i => i.value = '');
-  loadPolls();
-  openPoll(data.id);
-};
+            const optionsEl = document.getElementById('options-container');
+            optionsEl.innerHTML = poll.options.map(o => `
+                <button class="option-btn ${!poll.isOpen ? 'disabled' : ''}" data-option="${o.id}" ${!poll.isOpen ? 'disabled' : ''}>
+                    <span class="option-label">${escapeHtml(o.label)}</span>
+                    <span class="option-votes" id="option-votes-${o.id}">${o.votes}표</span>
+                </button>
+            `).join('');
+            optionsEl.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', () => castVote(btn.dataset.option));
+            });
+        }
 
-// ---------- Poll List ----------
-async function loadPolls() {
-  const res = await fetch(`${API}/api/polls`);
-  const polls = await res.json();
-  const list = $('pollList');
-  list.innerHTML = '';
-  if (polls.length === 0) {
-    list.innerHTML = '<div class="hint">아직 설문이 없습니다. 위에서 하나 만들어보세요.</div>';
-    return;
-  }
-  polls.slice().reverse().forEach(p => {
-    const div = document.createElement('div');
-    div.className = 'poll-item';
-    div.innerHTML = `<div class="q">${escapeHtml(p.question)}</div>
-      <div class="meta">by ${escapeHtml(p.creatorName)} · 총 ${p.total}표 · ${p.isOpen ? '진행중' : '마감'}</div>`;
-    div.onclick = () => openPoll(p.id);
-    list.appendChild(div);
-  });
-}
+        function showList() {
+            document.getElementById('detail-section').classList.add('hidden');
+            document.getElementById('polls-section').classList.remove('hidden');
+            if (currentRoom) socket.emit('room:leave', currentRoom);
+            currentRoom = null;
+        }
 
-// ---------- Poll Detail ----------
-let currentOptions = [];
+        async function castVote(optionId) {
+            if (!currentRoom) return;
+            if (!currentNickname) {
+                alert('투표하려면 먼저 로그인해주세요.');
+                return;
+            }
+            try {
+                const res = await fetch(`/api/polls/${currentRoom}/vote`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ optionId, userId: currentUserId })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    alert(err.error || '투표에 실패했습니다.');
+                }
+            } catch (err) {
+                console.error('Vote failed', err);
+            }
+        }
 
-async function openPoll(pollId) {
-  const res = await fetch(`${API}/api/polls/${pollId}`);
-  const poll = await res.json();
-  currentPollId = pollId;
-  currentOptions = poll.options;
+        function updatePollUI(data) {
+            // 카드형 목록 갱신
+            const totalEl = document.getElementById(`total-${data.pollId}`);
+            const bpmEl = document.getElementById(`bpm-${data.pollId}`);
+            if (totalEl) totalEl.innerText = data.total;
+            if (bpmEl) {
+                bpmEl.innerText = data.bpm ?? '--';
+                bpmEl.classList.add('pulse-flash');
+                setTimeout(() => bpmEl.classList.remove('pulse-flash'), 500);
+            }
 
-  $('pollDetail').classList.remove('hidden');
-  $('pollQuestion').textContent = poll.question;
-  $('pollBadge').textContent = poll.isOpen ? '진행중' : '마감됨';
-  $('pollBadge').className = 'badge ' + (poll.isOpen ? 'open' : 'closed');
-  $('btnClose').style.display = (poll.creatorId === me.id && poll.isOpen) ? 'block' : 'none';
+            // 상세(투표 참여) 화면 갱신
+            if (currentRoom === data.pollId) {
+                const detailTotal = document.getElementById('detail-total');
+                const detailBpm = document.getElementById('detail-bpm');
+                if (detailTotal) detailTotal.innerText = data.total;
+                if (detailBpm) {
+                    detailBpm.innerText = data.bpm ?? '--';
+                    detailBpm.classList.add('pulse-flash');
+                    setTimeout(() => detailBpm.classList.remove('pulse-flash'), 500);
+                }
+                if (data.options) {
+                    data.options.forEach(o => {
+                        const el = document.getElementById(`option-votes-${o.id}`);
+                        if (el) el.innerText = `${o.votes}표`;
+                    });
+                }
+            }
+        }
 
-  renderOptions(poll.options);
-  renderResults(poll.results, poll.total);
+        // --- 투표 생성 모달 ---
+        function openCreateModal() {
+            document.getElementById('poll-title-input').value = '';
+            document.getElementById('options-inputs').innerHTML = `
+                <input type="text" class="text-input option-input" placeholder="선택지 1">
+                <input type="text" class="text-input option-input" placeholder="선택지 2">
+            `;
+            document.getElementById('create-error').classList.add('hidden');
+            document.getElementById('create-modal').classList.remove('hidden');
+        }
 
-  $('chatLog').innerHTML = '';
-  const msgRes = await fetch(`${API}/api/polls/${pollId}/messages`);
-  const msgs = await msgRes.json();
-  msgs.forEach(m => appendChat(m.username, m.message));
+        function closeCreateModal() {
+            document.getElementById('create-modal').classList.add('hidden');
+        }
 
-  ws.send(JSON.stringify({ type: 'join', pollId }));
-  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-}
+        async function submitCreate() {
+            const title = document.getElementById('poll-title-input').value.trim();
+            const options = [...document.querySelectorAll('.option-input')]
+                .map(i => i.value.trim())
+                .filter(Boolean);
+            const errorEl = document.getElementById('create-error');
 
-function renderOptions(options) {
-  const area = $('optionsArea');
-  area.innerHTML = '';
-  options.forEach((opt, idx) => {
-    const div = document.createElement('div');
-    div.className = 'option-bar';
-    div.dataset.idx = idx;
-    div.innerHTML = `<div class="fill"></div><div class="label"><span>${escapeHtml(opt)}</span><span class="pct">0%</span></div>`;
-    div.onclick = () => vote(idx);
-    area.appendChild(div);
-  });
-}
+            if (!title || options.length < 2) {
+                errorEl.innerText = '제목과 2개 이상의 선택지를 입력해주세요.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
 
-function renderResults(results, total) {
-  const bars = document.querySelectorAll('.option-bar');
-  bars.forEach((bar, idx) => {
-    const count = results[idx] || 0;
-    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-    bar.querySelector('.fill').style.width = pct + '%';
-    bar.querySelector('.pct').textContent = `${count}표 (${pct}%)`;
-  });
-}
+            try {
+                const res = await fetch('/api/polls', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, options })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    errorEl.innerText = err.error || '투표 생성에 실패했습니다.';
+                    errorEl.classList.remove('hidden');
+                    return;
+                }
+                closeCreateModal();
+                loadPolls();
+            } catch (err) {
+                errorEl.innerText = '서버에 연결할 수 없습니다.';
+                errorEl.classList.remove('hidden');
+            }
+        }
 
-async function vote(optionIndex) {
-  const res = await fetch(`${API}/api/polls/${currentPollId}/vote`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ optionIndex })
-  });
-  const data = await res.json();
-  if (!res.ok) return alert(`오류: ${data.error}`);
-  // 결과는 WebSocket vote_update로 실시간 반영됨
-}
+        // --- 이벤트 바인딩 ---
+        document.getElementById('create-poll-btn').addEventListener('click', openCreateModal);
+        document.getElementById('cancel-create-btn').addEventListener('click', closeCreateModal);
+        document.getElementById('submit-create-btn').addEventListener('click', submitCreate);
+        document.getElementById('add-option-btn').addEventListener('click', () => {
+            const wrap = document.getElementById('options-inputs');
+            const idx = wrap.querySelectorAll('.option-input').length + 1;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'text-input option-input';
+            input.placeholder = `선택지 ${idx}`;
+            wrap.appendChild(input);
+        });
+        document.getElementById('back-btn').addEventListener('click', showList);
+        document.getElementById('close-poll-btn').addEventListener('click', async () => {
+            if (!currentRoom) return;
+            if (!confirm('이 투표를 마감할까요?')) return;
+            await fetch(`/api/polls/${currentRoom}/close`, { method: 'POST' });
+        });
 
-$('btnClose').onclick = async () => {
-  await fetch(`${API}/api/polls/${currentPollId}/close`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-};
-
-// ---------- Chat ----------
-function appendChat(username, message, isSystem = false) {
-  const log = $('chatLog');
-  const div = document.createElement('div');
-  div.className = isSystem ? 'msg sys' : 'msg';
-  div.innerHTML = isSystem ? escapeHtml(message) : `<b>${escapeHtml(username)}</b>: ${escapeHtml(message)}`;
-  log.appendChild(div);
-  log.scrollTop = log.scrollHeight;
-}
-
-$('btnSendChat').onclick = sendChat;
-$('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
-
-function sendChat() {
-  const input = $('chatInput');
-  const message = input.value.trim();
-  if (!message || !currentPollId) return;
-  ws.send(JSON.stringify({ type: 'chat', pollId: currentPollId, message }));
-  input.value = '';
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str ?? '';
-  return div.innerHTML;
-}
-</script>
-
+        // 초기화
+        renderAuth();
+        loadPolls();
+    </script>
 </body>
 </html>

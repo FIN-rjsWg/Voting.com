@@ -1,37 +1,23 @@
-import { WEBSOCKET_CONFIG } from '../config/websocket.js';
+// src/websocket/roomManager.js
+// 소켓 <-> 투표방(room) 매핑을 관리한다.
 
-class RoomManager {
-    constructor() {
-        this.rooms = new Map(); // pollId -> Set(ws)
-    }
+const socketRooms = new Map(); // socketId -> Set(roomId)
 
-    joinRoom(pollId, ws) {
-        if (!this.rooms.has(pollId)) {
-            this.rooms.set(pollId, new Set());
-        }
-        
-        const room = this.rooms.get(pollId);
-        if (room.size >= WEBSOCKET_CONFIG.MAX_CLIENTS_PER_POLL) {
-            throw new Error('Room is full');
-        }
-        
-        room.add(ws);
-        ws.currentRoom = pollId;
-    }
-
-    leaveRoom(pollId, ws) {
-        if (this.rooms.has(pollId)) {
-            this.rooms.get(pollId).delete(ws);
-            if (this.rooms.get(pollId).size === 0) {
-                this.rooms.delete(pollId);
-            }
-        }
-        ws.currentRoom = null;
-    }
-
-    getRoomClients(pollId) {
-        return this.rooms.get(pollId) || new Set();
-    }
+function joinRoom(socket, roomId) {
+    if (!roomId) return;
+    socket.join(roomId);
+    if (!socketRooms.has(socket.id)) socketRooms.set(socket.id, new Set());
+    socketRooms.get(socket.id).add(roomId);
 }
 
-export default new RoomManager();
+function leaveRoom(socket, roomId) {
+    if (!roomId) return;
+    socket.leave(roomId);
+    socketRooms.get(socket.id)?.delete(roomId);
+}
+
+function handleDisconnect(socket) {
+    socketRooms.delete(socket.id);
+}
+
+export default { joinRoom, leaveRoom, handleDisconnect };

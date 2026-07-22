@@ -1,36 +1,26 @@
+// server.js
 import express from 'express';
-import cors from 'cors';
 import { createServer } from 'http';
-import { fileURLToPath } from 'url';
+import { Server } from 'socket.io';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-import { PORT } from './src/config.js';
-import authRoutes from './src/routes/auth.routes.js';
-import pollRoutes from './src/routes/poll.routes.js';
-import { initWebSocket } from './src/ws/wsServer.js';
+import setupWebSocketHandlers from './src/websocket/handler.js';
+import pollsRouter from './src/routes/polls.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-app.use(cors());
+const httpServer = createServer(app);
+const io = new Server(httpServer);
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/api/polls', pollsRouter(io));
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: Date.now() });
-});
+io.on('connection', (socket) => setupWebSocketHandlers(io, socket));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/polls', pollRoutes);
-
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not Found' });
-});
-
-const server = createServer(app);
-initWebSocket(server);
-
-server.listen(PORT, () => {
-  console.log(`🚀 Live Poll server running: http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket endpoint:       ws://localhost:${PORT}/ws?token=<JWT>`);
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => {
+    console.log(`[PulseVote] Server running on http://localhost:${PORT}`);
 });

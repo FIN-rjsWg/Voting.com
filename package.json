@@ -1,25 +1,15 @@
 {
-  "name": "live-poll",
+  "name": "pulsevote",
   "version": "1.0.0",
-  "description": "실시간 설문/투표 서비스 - Mini Hackathon Prototype",
   "type": "module",
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "main": "src/server.js",
+  "description": "BPM 기반 실시간 투표 서비스",
+  "main": "server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "dependencies": {
-    "@prisma/client": "^7.9.0",
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "jsonwebtoken": "^9.0.2",
-    "prisma": "^7.9.0",
-    "uuid": "^9.0.1",
-    "ws": "^8.17.0"
+    "socket.io": "^4.7.5"
   }
 }
