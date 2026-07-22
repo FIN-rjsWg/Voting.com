@@ -1,12 +1,14 @@
 import { WebSocketServer } from 'ws';
-
 import { verifyToken } from '../middleware/auth.js';
-import { addMessage, getPollById } from '../db.js';
+import { db } from '../db.js';
 
+// pollId -> Set(ws)
 const pollRooms = new Map();
 
+let wss = null;
+
 export function initWebSocket(server) {
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  wss = new WebSocketServer({ server, path: '/ws' });
 
   wss.on('connection', (ws, req) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -20,28 +22,21 @@ export function initWebSocket(server) {
 
     ws.user = user;
     ws.joinedPollId = null;
+
     ws.send(JSON.stringify({ type: 'connected', username: user.username }));
 
-    ws.on('message', async (raw) => {
+    ws.on('message', (raw) => {
       let msg;
       try {
         msg = JSON.parse(raw.toString());
       } catch {
-        ws.send(JSON.stringify({ type: 'error', error: 'invalid JSON payload' }));
-        return;
+        return ws.send(JSON.stringify({ type: 'error', error: '잘못된 JSON 형식입니다' }));
       }
 
-      try {
-        if (msg.type === 'join') {
-          await handleJoin(ws, msg.pollId);
-        } else if (msg.type === 'chat') {
-          await handleChat(ws, msg.pollId, msg.message);
-        } else {
-          ws.send(JSON.stringify({ type: 'error', error: 'unsupported message type' }));
-        }
-      } catch (err) {
-        console.error(err);
-        ws.send(JSON.stringify({ type: 'error', error: 'server error' }));
+      if (msg.type === 'join') {
+        handleJoin(ws, msg.pollId);
+      } else if (msg.type === 'chat') {
+        handleChat(ws, msg.pollId, msg.message);
       }
     });
 
@@ -55,12 +50,12 @@ export function initWebSocket(server) {
   return wss;
 }
 
-async function handleJoin(ws, pollId) {
-  if (!pollId || !(await getPollById(pollId))) {
-    ws.send(JSON.stringify({ type: 'error', error: 'poll not found' }));
-    return;
+function handleJoin(ws, pollId) {
+  if (!db.polls.has(pollId)) {
+    return ws.send(JSON.stringify({ type: 'error', error: '존재하지 않는 설문입니다' }));
   }
 
+  // 기존 방에서 나가기
   if (ws.joinedPollId) {
     pollRooms.get(ws.joinedPollId)?.delete(ws);
   }
@@ -74,18 +69,22 @@ async function handleJoin(ws, pollId) {
   ws.send(JSON.stringify({ type: 'joined', pollId }));
 }
 
-async function handleChat(ws, pollId, message) {
+function handleChat(ws, pollId, message) {
   if (!message || typeof message !== 'string' || !message.trim()) return;
   if (ws.joinedPollId !== pollId) {
-    ws.send(JSON.stringify({ type: 'error', error: 'join the poll before chatting' }));
-    return;
+    return ws.send(JSON.stringify({ type: 'error', error: '먼저 join 해야 채팅할 수 있습니다' }));
   }
 
-  const entry = await addMessage({
-    pollId,
+  const entry = {
     userId: ws.user.id,
+    username: ws.user.username,
     message: message.trim(),
-  });
+    timestamp: Date.now(),
+  };
+
+  const history = db.messages.get(pollId) || [];
+  history.push(entry);
+  db.messages.set(pollId, history);
 
   broadcastToPoll(pollId, { type: 'chat', pollId, ...entry });
 }

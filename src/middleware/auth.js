@@ -1,28 +1,23 @@
-import jwt from 'jsonwebtoken';
+import authService from '../services/auth.service.js';
+import { fail } from '../utils/response.js';
 
-import { JWT_SECRET } from '../config.js';
+export const requireAuth = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json(fail('인증이 필요합니다'));
+    }
 
-export function requireAuth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authorization header is required (Bearer <token>)' });
-  }
+    const token = authHeader.split(' ')[1];
+    const user = authService.verifyToken(token);
 
-  const token = header.slice('Bearer '.length);
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = { id: payload.sub, username: payload.username };
-    return next();
-  } catch {
-    return res.status(401).json({ error: 'invalid or expired token' });
-  }
-}
+    if (!user) {
+        return res.status(401).json(fail('유효하지 않은 토큰입니다'));
+    }
 
-export function verifyToken(token) {
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    return { id: payload.sub, username: payload.username };
-  } catch {
-    return null;
-  }
-}
+    req.user = user;
+    next();
+};
+
+export const verifyToken = (token) => {
+    return authService.verifyToken(token);
+};
