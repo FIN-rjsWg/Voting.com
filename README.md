@@ -1,102 +1,40 @@
-# Live Poll — 실시간 설문/투표 서비스
+# ❤️ PulseVote (펄스보트)
 
-미니 해커톤 프로토타입. Node.js의 비동기 이벤트 기반 처리(논블로킹 I/O)가 다수 사용자의
-동시 투표 · 실시간 채팅을 자연스럽게 처리하는 모습을 보여주는 서비스입니다.
+> **심장 박동(BPM) 데이터 기반 실시간 반응형 투표 플랫폼**
 
-## 제약 조건 충족
+PulseVote는 사용자의 생체 신호(심장 박동수, BPM) 및 반응 데이터를 WebSocket을 통해 실시간으로 수집하고, 투표 진행 상황 및 몰입도를 시각적으로 브로드캐스팅하는 차세대 투표 시스템입니다.
 
-- ✅ Node.js 20.x 이상 (`"engines": { "node": ">=20.0.0" }`)
-- ✅ REST API 포함 (`/api/auth/*`, `/api/polls/*`)
-- ✅ WebSocket 사용 (`/ws` — 실시간 투표 결과, 채팅)
-- ✅ 회원가입 / 로그인 (JWT 기반)
-- ✅ 택1 → **실시간 채팅** (설문방 안에서 참가자끼리 의견 교환)
+---
 
-## 기술 스택
+## 🌟 주요 기능 (Key Features)
 
-- Express 4 (REST API)
-- `ws` (순수 WebSocket 서버)
-- `jsonwebtoken` + `bcryptjs` (인증)
-- 인메모리 저장소 (프로토타입 — 실서비스 전환 시 DB로 교체)
+- **⚡ 실시간 투표 및 스탯 브로드캐스팅**: Socket.io를 통해 투표 참여 현황과 실시간 통계를 전특 사용자에게 지연 없이 전달합니다.
+- **💓 펄스(BPM) 하트비트 시뮬레이션**: 사용자의 심장 박동 데이터를 연동하여 투표의 실시간 열기/몰입도(Average BPM)를 산출합니다.
+- **🎨 사이버펑크 펄스 테마**: 네온 핑크(`--pulse-red`)와 데이터 블루(`--data-blue`) 기반의 다크 모드 UI/UX 제공.
+- **🔐 안전한 인증 시스템**: JWT 기반 Access Token / Refresh Token 구조 및 쿠키 관리.
+- **🛡️ 안정적인 룸 관리**: WebSocket 연결 끊김 처리, 방 입장/퇴장 및 메모리 누수 방지 로직 구현.
 
-## 실행 방법
+---
 
-```bash
-npm install
-cp .env.example .env
-npm start
-# http://localhost:3000 접속 (public/index.html 데모 UI 포함)
-```
+## 📁 프로젝트 구조 (Project Structure)
 
-## 도메인 모델
-
-| 엔티티 | 필드 |
-|---|---|
-| User | id, username, passwordHash |
-| Poll | id, question, options[], creatorId, isOpen, createdAt |
-| Vote | pollId → userId → optionIndex (1인 1표) |
-| ChatMessage | pollId, userId, username, message, timestamp |
-
-## REST API
-
-### 인증
-
-```
-POST /api/auth/signup   { username, password } → 201 { id, username }
-POST /api/auth/login    { username, password } → 200 { token, user }
-```
-
-### 설문
-
-```
-GET  /api/polls                     설문 목록 + 실시간 집계
-POST /api/polls              (auth) { question, options[] } → 설문 생성
-GET  /api/polls/:id                 설문 상세 + 집계
-POST /api/polls/:id/vote     (auth) { optionIndex } → 투표 (1인 1표)
-POST /api/polls/:id/close    (auth) 설문 마감 (생성자만 가능)
-GET  /api/polls/:id/messages        채팅 이력 조회
-```
-
-인증이 필요한 요청은 `Authorization: Bearer <token>` 헤더 필요.
-
-## WebSocket 프로토콜
-
-접속: `ws://localhost:3000/ws?token=<JWT>`
-
-**Client → Server**
-```json
-{ "type": "join", "pollId": "..." }
-{ "type": "chat", "pollId": "...", "message": "..." }
-```
-
-**Server → Client**
-```json
-{ "type": "connected", "username": "..." }
-{ "type": "joined", "pollId": "..." }
-{ "type": "vote_update", "pollId": "...", "results": [3,5,1], "total": 9 }
-{ "type": "chat", "pollId": "...", "username": "...", "message": "...", "timestamp": 123 }
-{ "type": "poll_closed", "pollId": "..." }
-{ "type": "error", "error": "..." }
-```
-
-## 프로젝트 구조
-
-```
-live-poll/
-├── server.js                 # 엔트리포인트 (Express + WS 서버 결합)
+```text
+PulseVote/
+├── public/                 # 프론트엔드 정적 파일
+│   ├── index.html          # 클라이언트 대시보드 및 소켓 로직
+│   └── style.css           # 펄스 네온 다크 테마 스타일시트
 ├── src/
-│   ├── config.js             # 환경변수 설정
-│   ├── db.js                 # 인메모리 저장소
-│   ├── middleware/auth.js    # JWT 검증
-│   ├── routes/
-│   │   ├── auth.routes.js    # 회원가입/로그인
-│   │   └── poll.routes.js    # 설문 CRUD + 투표
-│   └── ws/wsServer.js        # WebSocket 서버 (join/chat/broadcast)
-└── public/index.html         # 데모 클라이언트 (바닐라 JS)
-```
-
-## 향후 개선 (프로덕션 전환 시)
-
-- 인메모리 → SQLite/Postgres 영속화
-- Redis Pub/Sub으로 멀티 인스턴스 스케일링 (현재는 단일 프로세스 브로드캐스트)
-- Refresh Token / Rate limiting
-- 입력 값 검증 라이브러리(zod 등) 도입
+│   ├── constants/          # 공통 상수 및 소켓 이벤트 정의
+│   │   └── events.js
+│   ├── controllers/        # API 요청 처리 컨트롤러
+│   │   ├── auth.controller.js
+│   │   └── poll.controller.js
+│   ├── services/           # 비즈니스 로직 (투표 및 펄스 데이터 처리)
+│   │   ├── poll.service.js
+│   │   └── pulse.service.js
+│   ├── websocket/          # 실시간 소켓 이벤트 핸들러 및 룸 관리자
+│   │   ├── handler.js
+│   │   └── roomManager.js
+│   └── app.js              # Express 및 Server 설정
+├── package.json
+└── README.md
