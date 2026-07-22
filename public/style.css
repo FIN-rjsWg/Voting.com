@@ -332,3 +332,15 @@ body {
     gap: 10px;
     margin-top: 24px;
 }
+
+/* --- 이미 투표함 안내 --- */
+.voted-badge {
+    background: rgba(0, 229, 255, 0.08);
+    border: 1px solid var(--data-blue);
+    color: var(--data-blue);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 16px;
+    display: inline-block;
+}

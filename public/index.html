@@ -40,6 +40,7 @@
                         <button id="back-btn" class="btn ghost">목록으로</button>
                     </div>
                 </div>
+                <p id="voted-badge" class="voted-badge hidden">✔ 이미 이 투표에 참여하셨습니다.</p>
                 <div id="options-container" class="options-list"></div>
             </section>
         </main>
@@ -76,7 +77,6 @@
         localStorage.setItem('userId', currentUserId);
         let currentNickname = localStorage.getItem('nickname') || null;
         let currentRoom = null;
-        let currentPollCache = null;
 
         // --- 인증 UI ---
         function renderAuth() {
@@ -110,6 +110,14 @@
             return div.innerHTML;
         }
 
+        // 투표 열기(BPM)에 맞춰 하트 아이콘 박동 속도를 조절 (BPM = 총 투표수 반영)
+        function applyPulseSpeed(bpm) {
+            const pulseIcon = document.querySelector('.pulse-icon');
+            if (!pulseIcon) return;
+            const beatsPerMinute = Math.min(180, 60 + (bpm || 0) * 4); // 투표가 많을수록 빠르게 박동
+            pulseIcon.style.animation = `heartbeat ${(60 / beatsPerMinute).toFixed(2)}s infinite`;
+        }
+
         // --- WebSocket 이벤트 리스너 ---
         socket.on('vote:cast', (data) => {
             updatePollUI(data);
@@ -120,23 +128,6 @@
             loadPolls();
             showList();
         });
-
-        // 가상의 심장 박동(BPM) 전송 시뮬레이터
-        setInterval(() => {
-            if (currentRoom && currentUserId) {
-                const simulatedBPM = Math.floor(Math.random() * (120 - 60 + 1)) + 60; // 60~120 BPM
-                socket.emit('pulse:heartbeat', {
-                    pollId: currentRoom,
-                    userId: currentUserId,
-                    bpm: simulatedBPM
-                });
-
-                const pulseIcon = document.querySelector('.pulse-icon');
-                if (pulseIcon) {
-                    pulseIcon.style.animation = `heartbeat ${60 / simulatedBPM}s infinite`;
-                }
-            }
-        }, 3000);
 
         // --- API 호출 및 렌더링 ---
         async function loadPolls() {
@@ -165,7 +156,7 @@
                     <h3>${escapeHtml(poll.title)}</h3>
                     <div class="poll-stats">
                         <span>총 투표수: <b id="total-${poll.id}">${poll.totalVotes || 0}</b></span>
-                        <span class="bpm-display">Avg BPM: <b id="bpm-${poll.id}" class="glow-text">${poll.averageBpm ?? '--'}</b></span>
+                        <span class="bpm-display">Avg BPM: <b id="bpm-${poll.id}" class="glow-text">${poll.averageBpm ?? 0}</b></span>
                     </div>
                 </div>
             `).join('');
@@ -175,13 +166,12 @@
         }
 
         async function joinPoll(pollId) {
-            const res = await fetch(`/api/polls/${pollId}`);
+            const res = await fetch(`/api/polls/${pollId}?userId=${encodeURIComponent(currentUserId)}`);
             if (!res.ok) return;
             const poll = await res.json();
 
             if (currentRoom) socket.emit('room:leave', currentRoom);
             currentRoom = pollId;
-            currentPollCache = poll;
             socket.emit('room:join', pollId);
             console.log(`Joined poll room: ${pollId}`);
 
@@ -193,19 +183,24 @@
             document.getElementById('detail-section').classList.remove('hidden');
             document.getElementById('detail-title').innerText = poll.title;
             document.getElementById('detail-total').innerText = poll.totalVotes || 0;
-            document.getElementById('detail-bpm').innerText = poll.averageBpm ?? '--';
+            document.getElementById('detail-bpm').innerText = poll.averageBpm ?? 0;
             document.getElementById('close-poll-btn').style.display = poll.isOpen ? '' : 'none';
+            document.getElementById('voted-badge').classList.toggle('hidden', !poll.hasVoted);
+            applyPulseSpeed(poll.averageBpm);
 
+            const locked = !poll.isOpen || poll.hasVoted;
             const optionsEl = document.getElementById('options-container');
             optionsEl.innerHTML = poll.options.map(o => `
-                <button class="option-btn ${!poll.isOpen ? 'disabled' : ''}" data-option="${o.id}" ${!poll.isOpen ? 'disabled' : ''}>
+                <button class="option-btn ${locked ? 'disabled' : ''}" data-option="${o.id}" ${locked ? 'disabled' : ''}>
                     <span class="option-label">${escapeHtml(o.label)}</span>
                     <span class="option-votes" id="option-votes-${o.id}">${o.votes}표</span>
                 </button>
             `).join('');
-            optionsEl.querySelectorAll('.option-btn').forEach(btn => {
-                btn.addEventListener('click', () => castVote(btn.dataset.option));
-            });
+            if (!locked) {
+                optionsEl.querySelectorAll('.option-btn').forEach(btn => {
+                    btn.addEventListener('click', () => castVote(btn.dataset.option));
+                });
+            }
         }
 
         function showList() {
@@ -227,12 +222,16 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ optionId, userId: currentUserId })
                 });
+                const data = await res.json();
                 if (!res.ok) {
-                    const err = await res.json();
-                    alert(err.error || '투표에 실패했습니다.');
+                    alert(data.error || '투표에 실패했습니다.');
+                    return;
                 }
+                // 서버가 돌려준 최신 상태(중복 투표 잠금 포함)로 즉시 갱신
+                showDetail(data);
             } catch (err) {
                 console.error('Vote failed', err);
+                alert('서버에 연결할 수 없습니다.');
             }
         }
 
@@ -242,18 +241,19 @@
             const bpmEl = document.getElementById(`bpm-${data.pollId}`);
             if (totalEl) totalEl.innerText = data.total;
             if (bpmEl) {
-                bpmEl.innerText = data.bpm ?? '--';
+                bpmEl.innerText = data.bpm ?? 0;
                 bpmEl.classList.add('pulse-flash');
                 setTimeout(() => bpmEl.classList.remove('pulse-flash'), 500);
             }
 
             // 상세(투표 참여) 화면 갱신
             if (currentRoom === data.pollId) {
+                applyPulseSpeed(data.bpm);
                 const detailTotal = document.getElementById('detail-total');
                 const detailBpm = document.getElementById('detail-bpm');
                 if (detailTotal) detailTotal.innerText = data.total;
                 if (detailBpm) {
-                    detailBpm.innerText = data.bpm ?? '--';
+                    detailBpm.innerText = data.bpm ?? 0;
                     detailBpm.classList.add('pulse-flash');
                     setTimeout(() => detailBpm.classList.remove('pulse-flash'), 500);
                 }
